@@ -1,12 +1,21 @@
 // @ts-check
 import { defineConfig } from 'astro/config';
 
-// URL pública del sitio: la imagen al compartir (og.png) necesita una dirección completa.
-// Se toma de SITE_URL, o de las variables que ponen Vercel y Netlify al desplegar.
+// La imagen al compartir (og.png) necesita la dirección completa del sitio.
+// Se detecta según dónde se construya:
+//  - SITE_URL (y BASE_PATH) si los defines tú
+//  - GitHub Pages: https://<usuario>.github.io/<repo>/
+//  - Vercel y Netlify: sus variables de despliegue
+const [ghOwner, ghRepo] = (process.env.GITHUB_REPOSITORY || '').split('/');
+const onGitHubPages = process.env.GITHUB_ACTIONS === 'true' && ghOwner && ghRepo;
+
 const site =
   process.env.SITE_URL ||
+  (onGitHubPages ? `https://${ghOwner}.github.io` : undefined) ||
   (process.env.VERCEL_PROJECT_PRODUCTION_URL && `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`) ||
   process.env.URL ||
   undefined;
 
-export default defineConfig({ site });
+const base = process.env.BASE_PATH || (onGitHubPages && !process.env.SITE_URL ? `/${ghRepo}` : undefined);
+
+export default defineConfig({ site, base });

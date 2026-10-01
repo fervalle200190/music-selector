@@ -30,8 +30,14 @@ npm run preview  # sirve ./dist
 
 Al compartir el link (WhatsApp, Instagram, iMessage…) aparece `public/og.png`: el disco con el texto "Para mi Margarita". Esa imagen necesita la dirección completa del sitio:
 
+- **GitHub Pages:** se detecta sola con el workflow `.github/workflows/deploy.yml`.
 - **Vercel o Netlify:** se detecta sola al desplegar.
-- **Otro hosting (GitHub Pages, etc.):** define la variable `SITE_URL` al construir, por ejemplo `SITE_URL=https://tu-dominio.com npm run build`.
+- **Otro hosting:** define la variable `SITE_URL` al construir, por ejemplo `SITE_URL=https://tu-dominio.com npm run build`.
+
+## Publicar en GitHub Pages
+
+1. En el repo, ve a **Settings → Pages** y en **Source** elige **GitHub Actions**.
+2. Cada push a `main` construye y publica el sitio en `https://fervalle200190.github.io/music-selector/`.
 
 ## Estructura
 
