@@ -11,7 +11,7 @@ Página web que recomienda una canción según cómo te sientes y la abre direct
 - **Historial:** guarda los ánimos y las canciones que abres, y evita repetir las últimas.
 - **Modo noche:** rosados oscuros con una transición animada.
 
-Todo lo que la persona elige se guarda en `localStorage` de su navegador. No hay servidor ni base de datos.
+Todo lo que la persona elige se guarda en `localStorage` de su navegador. No hay base de datos.
 
 ### Recomendaciones con IA
 
@@ -21,7 +21,7 @@ Los botones "✨ Recomiéndame más" y "✨ Buscar otros para este ánimo" piden
 - **Dentro de claude.ai:** usa la cuenta de Claude de quien abre la página.
 - **En GitHub Pages:** no hay servidor, así que esos botones no aparecen y el resto de la página funciona igual.
 
-Las instrucciones que recibe la IA están en `src/lib/prompts.js`. La función solo acepta listas cortas de nombres (nunca texto libre) y limita cuántas veces se puede usar por minuto, para que nadie la use como una API gratis.
+Las instrucciones que recibe la IA están en `src/lib/prompts.js`. La función solo acepta listas cortas de nombres (nunca texto libre) y permite máximo 20 pedidos cada 10 minutos por persona, para que nadie la use como una API gratis.
 
 ## Publicar en Vercel (con IA)
 
