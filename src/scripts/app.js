@@ -1,6 +1,7 @@
 import { A, T, MOODS } from '../data/moods.js';
 import { DISCOVER } from '../data/discover.js';
 import { MOOD_ARTISTS } from '../data/moodArtists.js';
+import { buildPrompt } from '../lib/prompts.js';
 /* Limpia datos de versiones de prueba anteriores */
 try { localStorage.removeItem("radio-margarita-historial"); localStorage.removeItem("radio-margarita-sugeridos"); localStorage.removeItem("radio-margarita-artistas"); localStorage.removeItem("radio-margarita-intro-v1"); localStorage.removeItem("radio-margarita-pasados"); localStorage.removeItem("radio-margarita-noche"); } catch(e){}
 
@@ -15,13 +16,12 @@ function topCounts(arr, f, n){
   const c = {}; arr.forEach(x=>{ const k=f(x); if(k) c[k]=(c[k]||0)+1; });
   return Object.entries(c).sort((a,b)=>b[1]-a[1]).slice(0,n);
 }
-function histSummary(){
-  const moods = topCounts(hist.moods, m=>MOODS[m.k] && MOODS[m.k].label.toLowerCase(), 3).map(([k,v])=>k+" ("+v+")");
-  const artists = topCounts(hist.plays, p=>p.artist, 5).map(([k,v])=>k+" ("+v+")");
-  const recent = hist.plays.slice(-6).map(p=>p.song+" de "+p.artist);
-  return `Cómo se ha sentido más seguido: ${moods.length ? moods.join(", ") : "aún no hay datos"}.
-Artistas que más ha abierto en Spotify: ${artists.length ? artists.join(", ") : "aún no hay datos"}.
-Lo último que escuchó: ${recent.length ? recent.join("; ") : "nada todavía"}.`;
+function histData(){
+  return {
+    moods: topCounts(hist.moods, m=>MOODS[m.k] && MOODS[m.k].label.toLowerCase(), 3),
+    artists: topCounts(hist.plays, p=>p.artist, 5),
+    recent: hist.plays.slice(-6).map(p=>p.song+" de "+p.artist)
+  };
 }
 
 const chipsEl = document.getElementById("chips");
@@ -287,10 +287,31 @@ function finishDeck(){
   burst(c);
 }
 
-/* ---------- Más artistas con IA (usa la cuenta de Claude de quien abre la página) ---------- */
+/* ---------- Más artistas con IA ----------
+   Dentro de claude.ai usa la cuenta de Claude de quien abre la página.
+   En el sitio publicado usa la función /api/recommend (la API key vive en el servidor). */
 let sampleFn = null, aiOff = false, aiNote = "", aiCtl = null;
+let claudeSample = null, serverAI = false;
+function aiReady(){ sampleFn = (claudeSample || serverAI) ? true : null; updateAgainLabel(); if(current) renderMoodArtists(); }
 if(window.claude && typeof window.claude.use === "function"){
-  window.claude.use("sample").then(f=>{ sampleFn = f || null; updateAgainLabel(); if(current) renderMoodArtists(); }).catch(()=>{});
+  window.claude.use("sample").then(f=>{ claudeSample = f || null; aiReady(); }).catch(()=>{});
+} else {
+  fetch(import.meta.env.BASE_URL.replace(/\/?$/, "/") + "api/recommend", { headers:{ accept:"application/json" } })
+    .then(r => r.ok ? r.json() : null).then(j => { serverAI = !!(j && j.ok); aiReady(); }).catch(()=>{});
+}
+
+/* Pide a la IA: kind "discover" (6 artistas para el swipe) o "mood" (3 artistas para un ánimo). */
+async function askAI(kind, data, signal){
+  if(claudeSample) return claudeSample.json(buildPrompt(kind, data), { modelTier:"quick", cache:false, signal });
+  let r;
+  try{
+    r = await fetch(import.meta.env.BASE_URL.replace(/\/?$/, "/") + "api/recommend", {
+      method:"POST", headers:{ "content-type":"application/json" }, body: JSON.stringify({ kind, data }), signal
+    });
+  }catch(e){ throw { code: (e && e.name === "AbortError") ? "cancelled" : "upstream_error" }; }
+  const j = await r.json().catch(()=>null);
+  if(!r.ok) throw { code: (j && j.code === "not_configured") ? "sampling_disabled" : ((j && j.code) || "upstream_error") };
+  return j.result;
 }
 const PASSED_KEY = "rmarg2-pasados";
 let passed = [];
@@ -323,23 +344,10 @@ async function loadMoreWithAI(){
   showLoading();
   const likes = [...FIXED, ...mine];
   const exclude = [...new Set([...likes, ...passed, ...suggestedEver])];
-  const prompt =
-`Eres una amiga melómana recomendando música a Margarita, una chica venezolana.
-Sus álbumes favoritos son "eternal sunshine" de Ariana Grande y "The Tortured Poets Department" de Taylor Swift.
-Artistas que le gustan: ${likes.join(", ")}.
-Artistas que NO le llamaron la atención: ${passed.length ? passed.join(", ") : "ninguno todavía"}.
-${histSummary()}
-
-Recomiéndale 6 artistas o bandas reales que probablemente le gusten, basándote sobre todo en los que le gustan y evitando parecerse a los que no.
-Puedes incluir algún artista latino o en español si encaja con su gusto.
-NO repitas ninguno de estos: ${exclude.join(", ")}.
-
-Responde solo con un array JSON de 6 objetos así:
-[{"name":"Nombre del artista","genre":"2 o 3 palabras","why":"Una frase en español, tuteándola, de máximo 110 caracteres, que conecte con lo que le gusta"}]
-En "why" no inventes datos: si no estás segura de una colaboración o un hecho, describe el estilo en vez de afirmarlo.`;
+  const data = { likes, passed, exclude, history: histData() };
   aiCtl = new AbortController();
   try{
-    const out = await sampleFn.json(prompt, { modelTier:"quick", cache:false, signal: aiCtl.signal });
+    const out = await askAI("discover", data, aiCtl.signal);
     const list = (Array.isArray(out) ? out : []).filter(o=>o && typeof o.name==="string" && o.name.trim())
       .map(o=>[String(o.name).trim().slice(0,40), String(o.genre||"Pop").trim().slice(0,28), String(o.why||"").trim().slice(0,140)])
       .filter(a=>!known(a[0]));
@@ -445,15 +453,10 @@ maAi.addEventListener("click", async ()=>{
   maAi.disabled = true; maAi.textContent = "Buscando…"; maNote.hidden = true;
   const likes = [...FIXED, ...mine];
   const exclude = [...new Set([...likes, ...passed, ...(maExtra[current]||[]), ...MOOD_ARTISTS[current]])];
-  const prompt =
-`Recomienda música a Margarita, una chica venezolana. Hoy se siente: "${moodName}".
-Sus favoritos: ${likes.join(", ")}. No le gustaron: ${passed.length ? passed.join(", ") : "ninguno todavía"}.
-${histSummary()}
-Dame 3 artistas o bandas reales que encajen con ese estado de ánimo y con su gusto. No repitas: ${exclude.join(", ")}.
-Responde solo con un array JSON de 3 nombres, por ejemplo ["Artista 1","Artista 2","Artista 3"].`;
+  const data = { mood: moodName, likes, passed, exclude, history: histData() };
   maCtl = new AbortController();
   try{
-    const out = await sampleFn.json(prompt, { modelTier:"quick", cache:false, signal: maCtl.signal });
+    const out = await askAI("mood", data, maCtl.signal);
     const names = (Array.isArray(out)?out:[]).map(x=>typeof x==="string"?x:(x&&x.name)).filter(x=>typeof x==="string"&&x.trim()).map(x=>x.trim().slice(0,40));
     const fresh = names.filter(n=>!inMine(n) && !wasPassed(n));
     if(!fresh.length){ maNote.textContent = "Esta vez no encontré otros nuevos. Prueba en un rato."; maNote.hidden = false; }

@@ -15,7 +15,21 @@ Todo lo que la persona elige se guarda en `localStorage` de su navegador. No hay
 
 ### Recomendaciones con IA
 
-Los botones "✨ Recomiéndame más" usan la capacidad `sample` de los Artifacts de claude.ai. Fuera de claude.ai, `window.claude` no existe, así que esos botones no aparecen y el resto de la página funciona igual.
+Los botones "✨ Recomiéndame más" y "✨ Buscar otros para este ánimo" piden artistas nuevos a Claude:
+
+- **En Vercel:** la página llama a la función `api/recommend.js`, que usa la API de Claude con la key guardada en el servidor.
+- **Dentro de claude.ai:** usa la cuenta de Claude de quien abre la página.
+- **En GitHub Pages:** no hay servidor, así que esos botones no aparecen y el resto de la página funciona igual.
+
+Las instrucciones que recibe la IA están en `src/lib/prompts.js`. La función solo acepta listas cortas de nombres (nunca texto libre) y limita cuántas veces se puede usar por minuto, para que nadie la use como una API gratis.
+
+## Publicar en Vercel (con IA)
+
+1. En [vercel.com](https://vercel.com) importa este repo. Detecta Astro solo, no hay que cambiar nada del build.
+2. En **Settings → Environment Variables** agrega:
+   - `ANTHROPIC_API_KEY`: tu key de [console.anthropic.com](https://console.anthropic.com).
+   - `ANTHROPIC_MODEL` (opcional): el modelo a usar. Por defecto `claude-haiku-4-5-20251001`, rápido y barato para esto.
+3. Vuelve a desplegar para que tome la variable.
 
 ## Desarrollo
 
