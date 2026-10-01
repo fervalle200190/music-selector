@@ -26,6 +26,13 @@ npm run build    # genera ./dist
 npm run preview  # sirve ./dist
 ```
 
+## Vista previa al compartir
+
+Al compartir el link (WhatsApp, Instagram, iMessage…) aparece `public/og.png`: el disco con el texto "Para mi Margarita". Esa imagen necesita la dirección completa del sitio:
+
+- **Vercel o Netlify:** se detecta sola al desplegar.
+- **Otro hosting (GitHub Pages, etc.):** define la variable `SITE_URL` al construir, por ejemplo `SITE_URL=https://tu-dominio.com npm run build`.
+
 ## Estructura
 
 ```

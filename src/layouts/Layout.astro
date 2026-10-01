@@ -10,6 +10,12 @@ const {
   title = 'La radio de Margarita',
   description = 'Dime cómo te sientes y te pongo la canción justa.',
 } = Astro.props;
+
+// Imagen para compartir (WhatsApp, Instagram, iMessage…): necesita URL absoluta.
+const base = Astro.site ?? Astro.url;
+const ogImage = new URL('/og.png', base).href;
+const pageUrl = new URL(Astro.url.pathname, base).href;
+const shareTitle = 'Para mi Margarita';
 ---
 
 <!doctype html>
@@ -21,6 +27,23 @@ const {
     <meta name="theme-color" content="#ffeef5" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>{title}</title>
+
+    <!-- Vista previa al compartir el link -->
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="es_VE" />
+    <meta property="og:site_name" content="La radio de Margarita" />
+    <meta property="og:title" content={shareTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={pageUrl} />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Un disco de vinilo rosado con margaritas y el texto Para mi Margarita" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={shareTitle} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImage} />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
