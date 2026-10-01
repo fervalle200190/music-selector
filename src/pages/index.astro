@@ -1,0 +1,33 @@
+---
+import Layout from '../layouts/Layout.astro';
+import SvgDefs from '../components/SvgDefs.astro';
+import ThemeToggle from '../components/ThemeToggle.astro';
+import Background from '../components/Background.astro';
+import Intro from '../components/Intro.astro';
+import Header from '../components/Header.astro';
+import Player from '../components/Player.astro';
+import MoodArtists from '../components/MoodArtists.astro';
+import MoodPicker from '../components/MoodPicker.astro';
+import MyArtists from '../components/MyArtists.astro';
+import History from '../components/History.astro';
+import Footer from '../components/Footer.astro';
+---
+
+<Layout>
+  <SvgDefs />
+  <ThemeToggle />
+  <Background />
+  <Intro />
+
+  <div class="wrap">
+    <Header />
+    <Player />
+    <MoodArtists />
+    <MoodPicker />
+    <MyArtists />
+    <History />
+    <Footer />
+  </div>
+</Layout>
+
+<script src="../scripts/app.js"></script>
