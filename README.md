@@ -26,7 +26,7 @@ Dónde funciona:
 - **Dentro de claude.ai:** usa la cuenta de Claude de quien abre la página.
 - **En GitHub Pages:** no hay servidor, así que esos botones no aparecen y el resto de la página funciona igual.
 
-Las instrucciones que recibe la IA están en `src/lib/prompts.js`. La función solo acepta listas cortas de nombres (nunca texto libre) y permite máximo 20 pedidos cada 10 minutos por persona, para que nadie la use como una API gratis.
+Las instrucciones que recibe la IA están en `src/lib/prompts.js`. La función solo acepta listas cortas de nombres y el texto de cómo se siente (máximo 140 caracteres), siempre dentro de instrucciones fijas, y permite máximo 20 pedidos cada 10 minutos por persona, para que nadie la use como una API gratis.
 
 ## Publicar en Vercel (con IA)
 
