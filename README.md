@@ -15,7 +15,12 @@ Todo lo que la persona elige se guarda en `localStorage` de su navegador. No hay
 
 ### Recomendaciones con IA
 
-Los botones "✨ Recomiéndame más" y "✨ Buscar otros para este ánimo" piden artistas nuevos a Claude:
+Con IA activa:
+
+- **Cuando ella escribe cómo se siente**, Claude elige una canción específica para eso (título y artista exactos) y "Otra canción" pide otra distinta. Si la IA falla, la página usa su lista curada.
+- **"✨ Recomiéndame más" y "✨ Buscar otros para este ánimo"** piden artistas nuevos.
+
+Dónde funciona:
 
 - **En Vercel:** la página llama a la función `api/recommend.js`, que usa la API de Claude con la key guardada en el servidor.
 - **Dentro de claude.ai:** usa la cuenta de Claude de quien abre la página.
@@ -29,6 +34,7 @@ Las instrucciones que recibe la IA están en `src/lib/prompts.js`. La función s
 2. En **Settings → Environment Variables** agrega:
    - `ANTHROPIC_API_KEY`: tu key de [console.anthropic.com](https://console.anthropic.com).
    - `ANTHROPIC_MODEL` (opcional): el modelo a usar. Por defecto `claude-haiku-4-5-20251001`, rápido y barato para esto.
+   - `SPOTIFY_CLIENT_ID` y `SPOTIFY_CLIENT_SECRET` (opcionales): con una app de [developer.spotify.com](https://developer.spotify.com/dashboard), el botón abre directo la canción elegida en vez de la búsqueda de ese título.
 3. Vuelve a desplegar para que tome la variable.
 
 ## Desarrollo

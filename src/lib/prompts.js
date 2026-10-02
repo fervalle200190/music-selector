@@ -17,7 +17,10 @@ Lo último que escuchó: ${(h.recent || []).length ? h.recent.join("; ") : "nada
 /**
  * kind "discover": 6 artistas nuevos para el swipe, como objetos {name, genre, why}.
  * kind "mood": 3 nombres de artistas para un estado de ánimo.
+ * kind "song": UNA canción específica según lo que ella escribió, como objeto {song, artist, why, mood}.
  */
+export const MOOD_KEYS = ["feliz","enamorada","triste","ansiosa","energia","nostalgica","cansada","rabia","extranando","motivada"];
+
 export function buildPrompt(kind, d) {
   if (kind === "discover") {
     return `Eres una amiga melómana recomendando música a Margarita, una chica venezolana.
@@ -40,6 +43,23 @@ Sus favoritos: ${list(d.likes, "Ariana Grande, Taylor Swift")}. No le gustaron: 
 ${historyText(d.history)}
 Dame 3 artistas o bandas reales que encajen con ese estado de ánimo y con su gusto. No repitas: ${list(d.exclude, "ninguno")}.
 Responde solo con un array JSON de 3 nombres, por ejemplo ["Artista 1","Artista 2","Artista 3"].`;
+  }
+  if (kind === "song") {
+    return `Eres una amiga melómana que conoce muy bien a Margarita, una chica venezolana.
+Sus álbumes favoritos son "eternal sunshine" de Ariana Grande y "The Tortured Poets Department" de Taylor Swift.
+Artistas que le gustan: ${list(d.likes, "Ariana Grande, Taylor Swift")}.
+Artistas que NO le llamaron la atención: ${list(d.passed, "ninguno todavía")}.
+${historyText(d.history)}
+
+Ahora mismo escribió cómo se siente: "${d.text}"
+
+Elige UNA canción real y específica que le haga bien en este momento, que encaje con lo que escribió.
+Prefiere artistas que le gustan, pero puedes salirte de esa lista si otra canción encaja mucho mejor.
+No elijas ninguna de estas, que ya escuchó o ya le salieron: ${list(d.avoid, "ninguna")}.
+No inventes canciones: si dudas de que una canción exista con ese título exacto, elige otra de la que estés segura.
+
+Responde solo con un objeto JSON así:
+{"song":"título exacto como aparece en Spotify","artist":"artista principal","why":"una frase en español, tuteándola, de máximo 110 caracteres, que conecte la canción con lo que siente","mood":"una de: ${MOOD_KEYS.join(", ")}"}`;
   }
   throw new Error("Tipo de recomendación desconocido");
 }

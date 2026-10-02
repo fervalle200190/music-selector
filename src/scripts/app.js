@@ -77,7 +77,23 @@ function pool(key){
 }
 
 let nowShowing = null;
+let aiSong = null;          // canción elegida por la IA para lo que ella escribió
+let textAsk = "";           // lo último que escribió, para pedir "otra" a la IA
+const aiSongsSeen = [];     // canciones que la IA ya le propuso en esta visita
+
+function showAISong(){
+  const { song, artist, why, url } = aiSong;
+  nowShowing = { song, artist, k: current };
+  els.label.textContent = said ? "Para cuando estás " + said.toLowerCase() : "Elegida para ti";
+  els.song.textContent = song; els.artist.textContent = artist; els.why.textContent = why || "";
+  els.link.href = url || spotifyUrl(song + " " + artist);
+  const vw = document.getElementById("vinylWrap");
+  vw.classList.add("lift"); clearTimeout(vw._t); vw._t = setTimeout(()=>vw.classList.remove("lift"), 700);
+  celebrate();
+}
+
 function show(){
+  if(aiSong) return showAISong();
   const m = MOODS[current]; const list = pool(current);
   const [song,artist,why,query] = list[idx % list.length];
   nowShowing = { song, artist, k: current };
@@ -118,6 +134,7 @@ function celebrate(){
 
 function pick(key,fresh,fromText){
   current = key;
+  if(!fromText){ aiSong = null; textAsk = ""; }
   if(!fromText) said = "";
   if(fresh){
     const list = pool(key);
@@ -132,6 +149,8 @@ function pick(key,fresh,fromText){
 }
 
 document.getElementById("another").addEventListener("click",()=>{
+  if(textAsk && sampleFn && !aiOff){ findSongWithAI(textAsk); return; }
+  aiSong = null;
   if(!current){ pick(Object.keys(MOODS)[Math.floor(Math.random()*10)],true); return; }
   idx++; show();
 });
@@ -179,12 +198,57 @@ function cleanSaid(raw){
   return raw.trim().replace(/^(hoy\s+)?(me siento|estoy|ando|siento que estoy|me encuentro)\s+/i,"").replace(/[.!¡¿?]+$/,"").slice(0,40);
 }
 
-document.getElementById("askForm").addEventListener("submit",e=>{
-  e.preventDefault();
-  const raw = document.getElementById("moodText").value;
-  if(!raw.trim()){ els.hint.textContent = "Escribe cómo te sientes, o toca una opción:"; return; }
+/* ---------- Canción específica con IA para lo que ella escribió ---------- */
+let songCtl = null;
+function setThinking(on){
+  playerEl.classList.toggle("thinking", on);
+  els.link.toggleAttribute("aria-disabled", on);
+  document.getElementById("another").disabled = on;
+  document.querySelector("#askForm button[type=submit]").disabled = on;
+  if(on){
+    els.label.textContent = said ? "Para cuando estás " + said.toLowerCase() : "Buscando";
+    els.song.textContent = "Buscando tu canción…";
+    els.artist.textContent = "";
+    els.why.textContent = "Estoy eligiendo una que encaje con lo que escribiste.";
+    playerEl.scrollIntoView({ behavior:"smooth", block:"center" });
+  }
+}
+async function findSongWithAI(raw){
+  if(songCtl) songCtl.abort();
+  songCtl = new AbortController();
+  textAsk = raw;
+  setThinking(true);
+  const recentPlays = hist.plays.slice(-15).map(p=>p.song+" de "+p.artist);
+  const data = {
+    text: raw.trim().slice(0,140),
+    likes: [...FIXED, ...mine], passed,
+    avoid: [...new Set([...aiSongsSeen.slice(-20), ...recentPlays])],
+    history: histData()
+  };
+  try{
+    const r = await askAI("song", data, songCtl.signal);
+    if(!r || typeof r.song !== "string" || typeof r.artist !== "string") throw { code:"invalid_json" };
+    aiSong = { song: r.song.slice(0,120), artist: r.artist.slice(0,80), why: String(r.why||"").slice(0,160), url: typeof r.url === "string" && r.url.startsWith("https://open.spotify.com/") ? r.url : null };
+    aiSongsSeen.push(aiSong.song + " de " + aiSong.artist);
+    const key = (r.mood && MOODS[r.mood]) ? r.mood : (readMood(raw) || current || "feliz");
+    setThinking(false);
+    current = key;
+    document.querySelectorAll(".chip").forEach(c=>c.setAttribute("aria-pressed","false"));
+    showAISong();
+    renderMoodArtists();
+    els.hint.textContent = "Elegí esta para ti. Si quieres otra, toca “Otra canción”.";
+    return true;
+  }catch(e){
+    setThinking(false);
+    if(e && e.code === "cancelled") return false;
+    if(e && ["not_granted","sampling_disabled","not_declared","capability_disabled","capability_removed"].includes(e.code)){ aiOff = true; updateAgainLabel(); }
+    aiSong = null; textAsk = "";
+    return false;
+  }
+}
+
+function pickFromText(raw){
   const best = readMood(raw);
-  said = cleanSaid(raw);
   if(best){
     pick(best,true,true); recordMood(best, said);
     els.hint.textContent = "Te entendí. Si quieres otra, toca “Otra canción”.";
@@ -193,6 +257,21 @@ document.getElementById("askForm").addEventListener("submit",e=>{
     pick(keys[Math.floor(Math.random()*keys.length)],true,true);
     els.hint.textContent = "No estoy segura de haberte entendido, así que te puse una sorpresa. Prueba con otras palabras o toca una opción:";
   }
+}
+
+document.getElementById("askForm").addEventListener("submit", async e=>{
+  e.preventDefault();
+  const raw = document.getElementById("moodText").value;
+  if(!raw.trim()){ els.hint.textContent = "Escribe cómo te sientes, o toca una opción:"; return; }
+  said = cleanSaid(raw);
+  if(sampleFn && !aiOff){
+    const ok = await findSongWithAI(raw);
+    if(ok){ recordMood(current, said); return; }
+    els.hint.textContent = "No pude buscar con IA ahora, así que te elegí una de tu lista.";
+    pickFromText(raw);
+    return;
+  }
+  pickFromText(raw);
 });
 renderTags();
 

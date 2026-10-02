@@ -268,3 +268,11 @@ footer .sig{font-family:var(--display);font-size:1.45rem;font-weight:600;color:v
   .actions .btn{justify-content:center;padding:12px 14px}
 }
 @media (max-width:600px){.d1{top:-80px;left:-90px}.d5{top:18%;right:6%}}
+/* Mientras la IA elige la canción */
+.player.thinking .vinyl{animation-duration:.9s}
+.player.thinking .tonearm{transform:rotate(-28deg)}
+.player.thinking .np .song{animation:thinkPulse 1.2s ease-in-out infinite}
+.player.thinking #spotify{opacity:.5;pointer-events:none}
+.player.thinking .btn[disabled]{opacity:.5;cursor:wait}
+@keyframes thinkPulse{0%,100%{opacity:1}50%{opacity:.45}}
+@media (prefers-reduced-motion: reduce){.player.thinking .np .song{animation:none}}

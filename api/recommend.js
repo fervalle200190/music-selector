@@ -1,11 +1,14 @@
 /*
- * Función de Vercel: recomienda artistas con la API de Claude.
+ * Función de Vercel: recomienda artistas y canciones con la API de Claude.
  * La API key vive en la variable de entorno ANTHROPIC_API_KEY y nunca llega al navegador.
  *
  * GET  /api/recommend  -> { ok: true } si la IA está configurada (la página lo usa para mostrar los botones)
- * POST /api/recommend  -> { kind: "discover" | "mood", data: {...} }  ->  { result: [...] }
+ * POST /api/recommend  -> { kind: "discover" | "mood" | "song", data: {...} }  ->  { result }
+ *
+ * Opcional: con SPOTIFY_CLIENT_ID y SPOTIFY_CLIENT_SECRET, la canción elegida se busca en Spotify
+ * y se devuelve el link directo a esa pista (result.url). Sin ellas, la página abre la búsqueda exacta.
  */
-import { buildPrompt } from "../src/lib/prompts.js";
+import { buildPrompt, MOOD_KEYS } from "../src/lib/prompts.js";
 
 const MODEL = process.env.ANTHROPIC_MODEL || "claude-haiku-4-5-20251001";
 
@@ -35,8 +38,49 @@ function clean(kind, d = {}) {
     passed: strList(d.passed),
     exclude: strList(d.exclude, 150),
     mood: kind === "mood" ? str(d.mood) || "tranquila" : undefined,
+    text: kind === "song" ? str(d.text, 140) || "con ganas de música" : undefined,
+    avoid: kind === "song" ? strList(d.avoid, 40, 90) : undefined,
     history: { moods: pairs(h.moods), artists: pairs(h.artists), recent: strList(h.recent, 6, 90) },
   };
+}
+
+// Toma el primer objeto JSON de la respuesta (para kind "song").
+function parseObject(text) {
+  const start = text.indexOf("{"), end = text.lastIndexOf("}");
+  if (start === -1 || end <= start) return null;
+  try { return JSON.parse(text.slice(start, end + 1)); } catch { return null; }
+}
+
+// Spotify (opcional): token de aplicación, guardado mientras dure.
+let spotifyToken = null, spotifyTokenExp = 0;
+async function spotifyTrack(song, artist) {
+  const id = process.env.SPOTIFY_CLIENT_ID, secret = process.env.SPOTIFY_CLIENT_SECRET;
+  if (!id || !secret) return null;
+  try {
+    if (!spotifyToken || Date.now() > spotifyTokenExp) {
+      const t = await fetch("https://accounts.spotify.com/api/token", {
+        method: "POST",
+        headers: {
+          "content-type": "application/x-www-form-urlencoded",
+          authorization: "Basic " + Buffer.from(id + ":" + secret).toString("base64"),
+        },
+        body: "grant_type=client_credentials",
+      });
+      if (!t.ok) return null;
+      const tj = await t.json();
+      spotifyToken = tj.access_token;
+      spotifyTokenExp = Date.now() + (tj.expires_in - 60) * 1000;
+    }
+    const q = encodeURIComponent(`track:"${song}" artist:"${artist}"`);
+    const r = await fetch(`https://api.spotify.com/v1/search?q=${q}&type=track&limit=1`, {
+      headers: { authorization: "Bearer " + spotifyToken },
+    });
+    if (!r.ok) return null;
+    const item = (await r.json())?.tracks?.items?.[0];
+    return item ? { url: item.external_urls?.spotify, song: item.name, artist: item.artists?.[0]?.name } : null;
+  } catch {
+    return null;
+  }
 }
 
 // Toma el primer array JSON de la respuesta, aunque venga con texto alrededor.
@@ -65,7 +109,7 @@ export default async function handler(req, res) {
 
   const body = typeof req.body === "string" ? safeJson(req.body) : req.body;
   const kind = body?.kind;
-  if (kind !== "discover" && kind !== "mood") return res.status(400).json({ code: "invalid_request" });
+  if (!["discover", "mood", "song"].includes(kind)) return res.status(400).json({ code: "invalid_request" });
 
   const prompt = buildPrompt(kind, clean(kind, body.data));
 
@@ -79,7 +123,7 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         model: MODEL,
-        max_tokens: kind === "discover" ? 900 : 200,
+        max_tokens: kind === "discover" ? 900 : kind === "song" ? 300 : 200,
         messages: [{ role: "user", content: prompt }],
       }),
     });
@@ -90,6 +134,17 @@ export default async function handler(req, res) {
     }
     const out = await r.json();
     const text = (out.content || []).filter((b) => b.type === "text").map((b) => b.text).join("");
+    if (kind === "song") {
+      const o = parseObject(text);
+      if (!o || typeof o.song !== "string" || typeof o.artist !== "string") return res.status(502).json({ code: "invalid_json" });
+      const result = {
+        song: str(o.song, 120), artist: str(o.artist, 80), why: str(o.why, 160),
+        mood: MOOD_KEYS.includes(o.mood) ? o.mood : null, url: null,
+      };
+      const found = await spotifyTrack(result.song, result.artist);
+      if (found?.url) Object.assign(result, { url: found.url, song: found.song || result.song, artist: found.artist || result.artist });
+      return res.status(200).json({ result });
+    }
     const result = parseArray(text);
     if (!result) return res.status(502).json({ code: "invalid_json" });
     return res.status(200).json({ result });
